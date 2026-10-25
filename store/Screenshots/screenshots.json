@@ -1,0 +1,16 @@
+{
+  "version": "0.3.0",
+  "language": "en-us",
+  "screenshots": [
+    {
+      "fileName": "controls.png",
+      "description": "Windows controls for Bluetooth connection, input capture, sensitivity and Android actions. Paired device details are hidden.",
+      "sha256": "94096e599b0b6b16e76c022b5f127a6d49899791ec1a80c5ae9c28f59ba23b94"
+    },
+    {
+      "fileName": "diagnostics.png",
+      "description": "Activity & Logs controls with an empty diagnostic buffer after clearing the test session.",
+      "sha256": "1ab9a841766e2135971200a8f1df320251da5e1130b8ac216d4bf7ca7c250e18"
+    }
+  ]
+}
