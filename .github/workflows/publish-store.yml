@@ -1,0 +1,88 @@
+name: Publish to Microsoft Store
+
+on:
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: Exact published release tag (for example v0.3)
+        required: true
+        default: v0.3
+        type: string
+      submit:
+        description: Commit the verified package to Partner Center for certification
+        required: true
+        default: false
+        type: boolean
+      resume_submission_id:
+        description: Optional API-created draft ID from a failed earlier run; never a web-edited draft
+        required: false
+        default: ''
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: lapdroid-store-publication
+  cancel-in-progress: false
+
+jobs:
+  prepare:
+    name: Verify and package verified release
+    runs-on: windows-2022
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Test publication guards
+        shell: pwsh
+        run: ./tools/Test-StorePublishing.ps1
+      - name: Package the verified published executable
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          RELEASE_TAG: ${{ inputs.release_tag }}
+        run: ./tools/Prepare-StoreCandidate.ps1 -ReleaseTag $env:RELEASE_TAG
+      - name: Verify candidate hashes and identity
+        shell: pwsh
+        run: |
+          . ./tools/StorePublishing.ps1
+          $null = Assert-LapdroidCandidate -Directory .build/store-candidate
+      - name: Upload verified Store candidate
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: Lapdroid-store-candidate
+          path: .build/store-candidate/*
+          if-no-files-found: error
+          retention-days: 30
+      - name: Validation-only result
+        if: ${{ !inputs.submit }}
+        shell: pwsh
+        run: "'Validation only: package and listing artifact prepared; Partner Center was not contacted.' >> $env:GITHUB_STEP_SUMMARY"
+
+  submit:
+    name: Submit to Partner Center
+    needs: prepare
+    if: ${{ inputs.submit && github.ref == 'refs/heads/main' }}
+    runs-on: windows-2022
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: Lapdroid-store-candidate
+          path: store-candidate
+      - name: Authenticate, upload, commit, and verify
+        shell: pwsh
+        env:
+          MS_STORE_TENANT_ID: ${{ secrets.MS_STORE_TENANT_ID }}
+          MS_STORE_CLIENT_ID: ${{ secrets.MS_STORE_CLIENT_ID }}
+          MS_STORE_CLIENT_SECRET: ${{ secrets.MS_STORE_CLIENT_SECRET }}
+          RESUME_SUBMISSION_ID: ${{ inputs.resume_submission_id }}
+        run: ./tools/Submit-Store.ps1 -CandidateDirectory store-candidate -ResumeSubmissionId $env:RESUME_SUBMISSION_ID

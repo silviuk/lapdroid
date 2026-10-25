@@ -14,3 +14,7 @@ Thumbs.db
 *.swp
 *.bak
 *~
+
+# Store packaging
+.build/
+dist/
